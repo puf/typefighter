@@ -1,0 +1,119 @@
+<html>
+<head>
+	<title>Lobby</title>
+	<script type='text/javascript' src='http://static.firebase.com/v0/firebase.js'></script>
+	<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js'></script>
+	<link rel='stylesheet' type='text/css' href='typefighter.css'></link>
+	
+</head>
+<body>
+	<h1>Game lobby</h1>
+	<p>Welcome <span id='player'></span></p>
+	<div>
+		<h2>Online players</h2>
+		<ul id='players'>
+		</ul>
+	</div>
+	<p>Click on the name of a player to challenge him/her or a <a id='sologame' href='#'>solo game</a>.</p>
+	<div id='challenge'>
+		You were challenged by <span id='challengers'></span>. 
+		Click a name to challenge/accept.
+	</div>
+	
+	<script type='text/javascript'>
+		/* FIREBASE DATA STRUCTURE (root = http://puf.firebaseio.com/lobby)
+			root
+				online
+					<playerName>
+						:<status> | <challenged_opponent>
+					<playerName>
+						:<status> | <challenged_opponent>
+		*/
+		
+		var name = getURLParameter('name') || prompt("What's your name?");
+		var isBot = name.indexOf('bot') == 0;
+		var opponent; // the player I currently challenged
+		
+		var lobbyRef = new Firebase('http://puf.firebaseio.com/lobby');
+		var playersRef = lobbyRef.child('online');
+		var myPlayerRef = playersRef.child(name);
+		myPlayerRef.removeOnDisconnect();
+		myPlayerRef.set(':online');
+		
+		function log(text) {
+			console.log(text);
+		};
+		function getURLParameter(name) {
+			return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
+		}
+
+		playersRef.on('child_added', function(snapshot) {
+			var player = snapshot.name();
+			if (player == name) return;
+			$('#players').prepend($('<li></li>').attr('id', 'player_'+player).text(player));
+		});
+		playersRef.on('child_removed', function(snapshot) {
+			var player = snapshot.name();
+			$("#player_" + player).remove();
+			// TODO: clear oponent if he was removed
+		});
+		playersRef.on('value', function(snapshot) {
+			var challengers = [];
+			snapshot.forEach(function(playerSnapshot) {
+				var player = playerSnapshot.name();
+				if (playerSnapshot.val() == name) {
+					challengers.push(player);
+				}
+			});
+			$('#challenge').toggle(challengers.length > 0);
+			if (challengers.length > 0) {
+				if (isBot && !opponent) {
+					setTimeout(function() {
+						opponent = challengers[0];
+						myPlayerRef.set(opponent);
+						$('player_'+opponent).addClass('selected');
+					}, 1000);
+				}
+				if (opponent && challengers.indexOf(opponent) > -1) {
+					$('#player_'+opponent).addClass('blink');
+					$('#challenge').hide();
+					setTimeout("document.location.assign('typefighter.html?name="+name+"&opponent="+opponent+"')", 2000);
+				} else {
+					$('#challengers').text(challengers.join(' and '));
+				}
+			}
+			$('#players li').each(function() { $(this).toggleClass('challenger', challengers.indexOf($(this).text()) > -1) } );
+		});
+
+		// this gets executed when the DOM had loaded
+		$(function() {
+			$('#player').text(name); // show our name
+			
+			if (!isBot) {
+				$(document).on('click', '#players li', function() {
+					var player = $(this).text();
+					if (!opponent) {
+						opponent = player;
+						myPlayerRef.set(player);
+						$(this).addClass('selected');
+					} else if (opponent == player) {
+						opponent = undefined;
+						myPlayerRef.set(':online');
+						$(this).removeClass('selected');					
+					}
+				});
+				$('#sologame').click(function() {
+					alert('starting a solo game');
+					
+					var gotdRef = new Firebase('http://gamma.firebase.com/puf/typefighter/gotd');
+					playersRef.on('value', function(snapshot) {
+						var gameid = snapshot.val();
+						$('#sologame').addClass('blink');
+						setTimeout("document.location.assign('solo.html?name="+name+"&id="+gameid+"')", 1000);
+					});
+				});
+			}
+		});
+    </script>
+  </body>
+</html>

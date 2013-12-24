@@ -1,0 +1,124 @@
+/* Global */
+
+body {
+  margin-top: 20px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 400px;
+  background-color: #f8f8f8;
+  font-size: 24px;
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #424547;
+  text-align: center;
+}
+
+h1 {
+  font-size: 36px;
+  font-weight: bold;
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #424547;
+}
+
+h3 {
+  font-size: 24px;
+  font-family: "proxima-nova", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #424547;
+}
+
+p {
+ font-size: 16px;
+}
+
+input {
+  font-size: 24px;
+}
+
+input[type=text] {
+  color: #424547;
+  border: 1px solid #c2c2c2;
+  background-color: white;
+}
+
+em {
+  font-style: normal;
+  font-weight: bold;
+  color: black;
+}
+
+/* TypeFighter */
+
+.gamescreen {
+	/* gamescreens are displayed on demand by the code */
+	display: none;
+}
+
+#wordsDiv {
+  background-color: white;
+  height: 350px;
+  width: 50%;
+  margin-left: 25%;
+  top: 0px;
+  float: left;
+}
+
+#wordsDiv .word {
+	color: silver;
+	/*font-family: 'Aldrich', sans-serif;*/
+}
+
+#wordsDiv .word.selected  .letter.selected {
+	color: black;
+}
+#wordsDiv .word.otherselected .letter {
+	border-bottom: 1px solid black;
+}
+
+#wordInput {
+	width: 50%;
+}
+
+/* Solo */
+
+#newpersonalbest {
+	display: none;
+}
+
+#topscore-template {
+	display: none;
+}
+
+/* Lobby */
+
+ul#players li {
+	list-style: none;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+ul#players li.selected:before {
+	content: '! ';
+}
+
+ul#players li.challenger:after {
+	content: ' ?';
+}
+
+#challenge {
+	float: right;
+	display: none; /* hide initially */
+}
+
+
+
+/* blinking on webkit */
+@-webkit-keyframes blink {  
+  from { opacity: 1.0; }
+  to { opacity: 0.0; }
+}
+
+.blink {
+  -webkit-animation-name: blink;  
+  -webkit-animation-iteration-count: infinite;  
+  -webkit-animation-timing-function: cubic-bezier(1.0,0,0,1.0);
+  -webkit-animation-duration: 0.5s; 
+}

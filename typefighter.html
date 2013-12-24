@@ -1,0 +1,301 @@
+<html>
+<head>
+	<title>Type Fighter</title>
+	<script type='text/javascript' src='http://static.firebase.com/v0/firebase.js'></script>
+	<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
+	<link rel='stylesheet' type='text/css' href='typefighter.css'>
+	<!--
+	<link href='http://fonts.googleapis.com/css?family=Aldrich' rel='stylesheet' type='text/css'>	
+	-->
+</head>
+<body>
+	<div class='gamescreen' data-gamephase='Loading'>
+		<h2>Waiting for opponent(s) to join</h2>
+	</div>
+	<div class='gamescreen' data-gamephase='Loaded'>
+		<h2>Game will start when all players are ready</h2>
+		<h3>Press any key when you are ready to play</h3>
+	</div>
+	<div class='gamescreen' data-gamephase='Waiting'>
+		<h2>Get set...</h2>
+	</div>
+	<div class='gamescreen' data-gamephase='Done'>
+		<h2>Game Over</h2>
+		<h3>Results</h3>
+		<div id='finalscores'></div>
+		<p>Press any key to return to the lobby</p>
+	</div>
+	<div class='gamescreen' data-gamephase='Playing'>
+		<div>
+			<span style='float:left'><div>Time left:<div id='clock'></div></div></span>
+			<span style='float:left'><div>Scores:<div id='scores'/></div></span>
+		</div>
+		<div id='wordsDiv'></div>
+		<input type='text' id='wordInput' placeholder='Type a word'></input>
+	</div>
+	
+	<script type='text/javascript'>
+		/* FIREBASE DATA STRUCTURE (root = http://puf.firebaseio.com/typefighter)
+			root
+				scores
+					<playerA>
+						<score>
+					<playerB>
+						<score>
+				players
+					<playerA>
+						<WordB> | :<Phase>
+					<playerB>
+						<WordB>
+				words
+					<WordA>
+						<number_of_letters>
+					<WordB>
+		*/
+		var GamePhase = { Loading: ':Loading', Loaded: ':Loaded', Waiting: ':Waiting', Playing: ':Playing', Done: ':Done' };
+		
+		var name = getURLParameter('name') || prompt("What's your name?");
+		var isBot = name.indexOf('bot_') == 0;
+		var botSpeed = isBot ? parseInt(name.substring(4)) : -1;
+		var opponent = getURLParameter('opponent') || prompt("What's your opponent's name?");
+		var maxWords = 10;
+		var gameTime = 15;
+		var playerCount = 2;
+		var dictionary;
+		var endTime;
+		var phase;
+		var myCurrentWord;
+
+		// References to Firebase nodes
+		var dataRef = new Firebase('http://puf.firebaseio.com/typefighter');
+		var gameRef = dataRef.child('game_'+(name<opponent ? name+'_'+opponent : opponent+'_'+name));
+		var wordsRef = gameRef.child('words');
+		var playersRef = gameRef.child('players');
+		var myPlayerRef = playersRef.child(name);
+		var scoresRef = gameRef.child('scores');
+		var myScoreRef = scoresRef.child(name);
+		
+		// clear current word
+		playersRef.child(name).remove();
+		
+		// clear last score against this player
+		// TODO: don't clear when there's a game is going on
+		myScoreRef.set(0);
+		
+		setGamePhase(GamePhase.Loading);
+		
+		function log(text) {
+			console.log(text);
+		};
+		function getURLParameter(name) {
+			return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
+		}
+		function onGameOver() {
+			setGamePhase(GamePhase.Done);
+		}
+		function onSecondPassed() {
+			if (endTime) {
+				var left = endTime - new Date().getTime();
+				$('#clock').text(Math.round(left/1000));
+			} else {
+				$('#clock').text('0');
+			}
+		}
+		function onBotTurn() {
+			if (myCurrentWord) {
+				var text = $('#wordInput').val();
+				text = myCurrentWord.substring(0, text.length + 1);
+				$('#wordInput').val(text);
+
+				if (!evaluateInput(text)) myCurrentWord = undefined; // the other player completed our word!
+			} else {
+				var words = $('#wordsDiv div.word');
+				var which = Math.floor(Math.random() * words.size());
+				myCurrentWord = $($(words).get(which)).text();
+				$('#wordInput').val(myCurrentWord[0]);
+				myPlayerRef.set(myCurrentWord);
+			}
+		}
+		
+		function setGamePhase(newPhase) {
+			if (newPhase != phase) {
+				console.log('Changing game phase from '+phase+' to '+newPhase);
+				// clean up the current phase
+				if (phase) $('.gamescreen[data-gamephase="'+phase.substring(1)+'"]').hide();
+
+				phase = newPhase;
+				myPlayerRef.set(phase);
+
+				// update for the new phase
+				if (phase) $('.gamescreen[data-gamephase="'+phase.substring(1)+'"]').show();
+				switch (phase) {
+					case GamePhase.Loading:
+						break;
+					case GamePhase.Loaded:
+						if (isBot) {
+							setGamePhase(GamePhase.Waiting, 1000);
+						}
+						break;
+					case GamePhase.Waiting: 
+						break;
+					case GamePhase.Playing:
+						var now = new Date().getTime();
+						endTime = now + gameTime * 1000;
+						setTimeout(onGameOver, gameTime * 1000);
+						setInterval(onSecondPassed, 1000); // TODO: start this one sooner?
+						if (isBot) setInterval(onBotTurn, botSpeed);
+						$('#wordInput').focus();
+						break;
+					case GamePhase.Done:
+						endTime = undefined;
+						$('#finalscores').html($('#scores').html());
+						if (isBot) {
+							$('.gamescreen[data-gamephase="Done"] h2').addClass('blink');
+							$('.gamescreen[data-gamephase="Done"] p').hide();
+							setTimeout("document.location.assign('lobby.html?name="+name+"')", 2000);
+						}
+						break;
+					default:
+						alert('Invalid GamePhase: '+phase);
+				}
+			}
+		}
+		function evaluateInput(text) {
+			var foundMatch = false;
+			if (text.length > 0) {
+				$('#wordsDiv div.word').each(function() {
+					var word = $(this).text();
+					if (word.indexOf(text) === 0) {
+						foundMatch = true;
+						if (word != myCurrentWord) {
+							myPlayerRef.set(word);
+						}
+						// TODO: clear selected letters on the previous word
+						$(this).children('.letter').each(function(index, elm) {
+							$(this).toggleClass('selected', index < text.length);
+						});
+						// handle the word being completed, so the player doesn't need to press <enter>
+						if (text.length == word.length) {
+							myScoreRef.transaction(function(score) {
+								return score + text.length - 2;
+							});
+							myPlayerRef.set('');
+							wordsRef.child(text).remove();
+							$('#wordInput').val('');
+							foundMatch = false; // fake not finding a match, since the player completed the word
+						}
+					}
+				});
+			}
+			return foundMatch;
+		}
+		
+		//$('#wordInput').keypress(function (e) {
+		$(document).keypress(function (e) {
+			if (isBot) return false; // ignore all keypresses when a bot is playing in this client
+			var mustCancel = false;
+			switch (phase) {
+				case GamePhase.Loaded:
+					setGamePhase(GamePhase.Waiting);
+					mustCancel = true;
+					break;
+				case GamePhase.Playing:
+					var text = $('#wordInput').val();
+					if (e.which >= 97 && e.which <=122) text += String.fromCharCode(e.which);
+
+					mustCancel = !evaluateInput(text);
+
+					break;
+				case GamePhase.Done: 
+					$('.gamescreen[data-gamephase="Done"] h2').addClass('blink');
+					$('.gamescreen[data-gamephase="Done"] p').hide();
+					setTimeout("document.location.assign('lobby.html?name="+name+"')", 2000);
+					break;				
+			}
+			
+			if (mustCancel) return false;
+		});
+		wordsRef.on('child_added', function(snapshot) {
+			var word = snapshot.name();
+			var wordDiv = $('<div class="word"/>').attr('id', 'word_'+word);
+			$(word.split('')).each(function(){ 
+				$('<span class="letter">'+this+'</span>').appendTo(wordDiv) 
+			});
+			$('#wordsDiv').append(wordDiv);
+		});
+		wordsRef.on('child_removed', function(snapshot) {
+			var word = snapshot.name();
+			$('#word_'+word).remove();
+		});
+		function areAllPlayersInPhase(playersSnapshot, testphase) {
+			var count = 0;
+			var allInPhase = !playersSnapshot.forEach(function(playerSnapshot) {
+				count++;
+				return playerSnapshot.val() != testphase;
+			});
+			return allInPhase && count == playerCount;
+		}
+		playersRef.on('value', function(playersSnapshot) {
+			switch (phase) {
+				case GamePhase.Loading: {
+					if (areAllPlayersInPhase(playersSnapshot, GamePhase.Loading)) {
+						setGamePhase(GamePhase.Loaded);
+					}			
+					break;
+				}
+				case GamePhase.Waiting: {
+					if (areAllPlayersInPhase(playersSnapshot, GamePhase.Waiting)) {
+						setGamePhase(GamePhase.Playing);
+					}
+					break;
+				}
+				case GamePhase.Playing: {
+					var words = $('#wordsDiv div.word');
+					words.removeClass('selected otherselected');
+					playersSnapshot.forEach(function(playerSnapshot) {
+						var player = playerSnapshot.name();
+						var word = playerSnapshot.val();
+						$('#word_'+word).addClass(player == name ? 'selected': 'otherselected');
+						if (player == name && word.charAt(0) !== ':' && word != myCurrentWord) {
+							myCurrentWord = word;
+							console.log(name+' started typing '+word);
+						}
+					});
+					break;
+				}
+			}
+		});
+		scoresRef.on('value', function(scoresSnapshot) {
+			$('#scores').empty();
+			scoresSnapshot.forEach(function(scoreSnapshot) {
+				var player = scoreSnapshot.name();
+				var score = scoreSnapshot.val();
+				$('#scores').append(player+': '+score+'<br/>');
+			});
+		});
+		jQuery.ajax({
+			url: "dictionary/common.txt",
+			dataType: "text",
+			success: function( txt ) {
+				log("Dictionary loaded ("+txt.length+" characters)");
+				dictionary = txt.split(' ');
+				log("Dictionary loaded ("+dictionary.length+" words)");
+			},
+			error: function(XMLHttpRequest, textStatus, errorThrown) {
+				log("Unable to load dictionary, you can only remove existing words");
+			}
+		});
+		setInterval(function() {
+			var words = $('#wordsDiv div.word');
+			if (words.length < maxWords && dictionary) {
+				var word = dictionary[Math.round(Math.random() * dictionary.length)];
+				// Only allow words that start with different letters from the ones we already have
+				while (words.filter(function() { return $(this).text()[0] == word[0]; }).size() > 0) {
+					word = dictionary[Math.round(Math.random() * dictionary.length)];
+				}
+				wordsRef.child(word).set(word.length);
+			}
+		}, 1000);
+    </script>
+  </body>
+</html>

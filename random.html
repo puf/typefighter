@@ -1,0 +1,52 @@
+<html>
+<head>
+	<title>Type Fighter</title>
+	<script type='text/javascript' src='http://static.firebase.com/v0/firebase.js'></script>
+	<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
+	<link rel='stylesheet' type='text/css' href='typefighter.css'>
+</head>
+<body>
+<script type='text/javascript'>
+function random(){
+	// Robert Jenkins' 32 bit integer hash function - JS implementation from V8 benchmark
+	var seed = initSeed = initSeed + numGames;
+	seed = ((seed + 0x7ed55d16) + (seed << 12))  & 0xffffffff;
+	seed = ((seed ^ 0xc761c23c) ^ (seed >>> 19)) & 0xffffffff;
+	seed = ((seed + 0x165667b1) + (seed << 5))   & 0xffffffff;
+	seed = ((seed + 0xd3a2646c) ^ (seed << 9))   & 0xffffffff;
+	seed = ((seed + 0xd3a2646c) ^ (seed << 9))   & 0xffffffff;
+	seed = ((seed + 0xfd7046c5) + (seed << 3))   & 0xffffffff;
+	seed = ((seed ^ 0xb55a4f09) ^ (seed >>> 16)) & 0xffffffff; 
+	return (seed & 0xfffffff) / 0x10000000;
+}
+// Random generation
+var numGames = 1000000;
+var initSeed = Math.round(Math.random() * numGames);
+
+if (location.search) {
+	initSeed = parseInt(location.search.match(/game=(\d+)/)[1]);
+	alert(initSeed);
+}
+
+
+/*
+$.ajax({
+	url: "dictionary/common.txt",
+	dataType: "text",
+	success: function( txt ) {
+		var dictionary = txt.split(' ');
+		var i;
+		for (i=0; i < 10; i++) {
+			var which = Math.floor(random() * dictionary.length);
+			console.log(dictionary[which]);
+		}
+	},
+	error: function(XMLHttpRequest, textStatus, errorThrown) {
+		log("Unable to load dictionary, you can only remove existing words");
+	}
+});
+*/
+
+</script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<html>
+<head>
+	<title>Type Fighter Solo</title>
+	<script type='text/javascript' src='http://static.firebase.com/v0/firebase.js'></script>
+	<script type='text/javascript' src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js'></script>
+	<link rel='stylesheet' type='text/css' href='typefighter.css'>
+	<!--
+	<link href='http://fonts.googleapis.com/css?family=Aldrich' rel='stylesheet' type='text/css'>	
+	-->
+</head>
+<body>
+	<div class='gamescreen' data-gamephase='Loading'>
+		<h2>Waiting for game data</h2>
+	</div>
+	<div class='gamescreen' data-gamephase='Loaded'>
+		<h2>Press any key when you are ready to play</h2>
+	</div>
+	<div class='gamescreen' data-gamephase='Done'>
+		<h2>Game Over</h2>
+		<h3>Result</h3>
+		<br/>
+		<div>Score: <span id='finalscore'></span></div>
+		<div>Your best: <span id='personalbest'></span></div>
+		<div id='newpersonalbest'>That's a new personal best!</div>
+		<br/>
+		<div id='topscores'>
+			<div class='topscore' id='topscore-template'><span class='rank'/>{0}</span> : <span class='name'>{1}</span> - <span class='score'>{2}</span></div>
+		</div>
+		<div id='closescores'></div>
+		<!--
+		<p>Press any key to return to the lobby</p>
+		-->
+	</div>
+	<div class='gamescreen' data-gamephase='Playing'>
+		<div>
+			<span style='float:left'><div>Time left:<div id='clock'></div></div></span>
+			<span style='float:left'><div>Score:<div id='scores'/></div></span>
+		</div>
+		<div id='wordsDiv'></div>
+		<input type='text' id='wordInput' placeholder='Type a word'></input>
+	</div>
+	
+	<script type='text/javascript'>
+		/* FIREBASE DATA STRUCTURE (root = http://gamma.firebase.com/puf/typefighter)
+			game_<name>
+				score
+					<score>
+				words
+					<WordA>
+						<number_of_letters>
+					<WordB>
+			highscores
+				game_<gamenum>_time_<gametime>
+					<name> (.priority = <score>)
+						score: <score>
+						keystrokes: <keystrokes>
+			
+		*/
+		var GamePhase = { Loading: ':Loading', Loaded: ':Loaded', Playing: ':Playing', Done: ':Done' };
+		
+		var name = getURLParameter('name') ||  prompt("What's your name?");
+		if (!getURLParameter('name')) document.location.assign(document.location.href + '?name='+name);
+		var maxWords = 10;
+		var gameTime = 15;
+		var dictionary;
+		var startTime, endTime;
+		var phase;
+		var myCurrentWord;
+		var gamenum;
+		var keystrokes = []; // array of [ <offset>, <char> ]
+		var myHighscore = 0;
+		var numGames = 1000000;
+		var templates = {};
+
+		// References to Firebase nodes
+		var dataRef = new Firebase('http://puf.firebaseio.com/typefighter');
+		var gotdRef = dataRef.child('gotd');
+		var gameRef = dataRef.child('game_'+name);
+		var wordsRef = gameRef.child('words');
+		var myScoreRef = gameRef.child('score');
+		var highscoresRef;
+		var myHighscoreRef;
+		
+		// clear last score and list of words
+		myScoreRef.set(0);
+		wordsRef.remove();
+		
+		setGamePhase(GamePhase.Loading);
+		
+		function log(text) {
+			console.log(text);
+		};
+		function getTemplate(name) {
+			var template = templates[name];
+			if (!template) {
+				template = $('#'+name+'-template')[0];
+				template.parentNode.removeChild(template);
+				template.id = '';
+				templates[name] = template = template.outerHTML;
+			}
+			return template;
+		}
+		function format(template) {
+			result = template.replace('id=', 'templateid=');
+			for (var i=0; i < arguments.length-1; i++) result = result.replace('\{'+i+'\}', arguments[i+1]); 
+			return result;
+		}
+		function getURLParameter(name) {
+			return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
+		}
+		function onGameOver() {
+			setGamePhase(GamePhase.Done);
+		}
+		function onSecondPassed() {
+			if (endTime) {
+				var left = endTime - new Date().getTime();
+				$('#clock').text(Math.round(left/1000));
+			} else {
+				$('#clock').text('0');
+			}
+		}
+		
+		function setGamePhase(newPhase) {
+			if (newPhase != phase) {
+				console.log('Changing game phase from '+phase+' to '+newPhase);
+				// clean up the current phase
+				if (phase) $('.gamescreen[data-gamephase="'+phase.substring(1)+'"]').hide();
+
+				phase = newPhase;
+				//myPlayerRef.set(phase);
+
+				// update for the new phase
+				if (phase) $('.gamescreen[data-gamephase="'+phase.substring(1)+'"]').show();
+				switch (phase) {
+					case GamePhase.Loading:
+						break;
+					case GamePhase.Loaded:
+						break;
+					case GamePhase.Playing:
+						startTime = new Date().getTime();
+						endTime = startTime + gameTime * 1000;
+						setTimeout(onGameOver, gameTime * 1000);
+						setInterval(onSecondPassed, 1000); // TODO: start this one sooner?
+						//$('#wordInput').attr('readonly', 'readonly'); // disable the input from receiving the focus, we handle all input ourselves
+						$('#wordInput').focusout(function() { console.log('no you don\'t, putting focus back'); $('#wordInput').focus(); } );
+						$('#wordInput').focus();
+						break;
+					case GamePhase.Done:
+						endTime = undefined;
+						$('#finalscore').html($('#scores').html());
+						var score = $('#scores').text();
+						console.log('Checking for new PR: '+parseInt(score)+' > '+parseInt(myHighscore));
+						if (parseInt(score) > parseInt(myHighscore)) {
+							$($('#personalbest')[0].parentNode).hide();
+							$('#newpersonalbest').show().addClass('blink');
+							myHighscoreRef.setWithPriority({keystrokes: JSON.stringify(keystrokes), score: score}, score);
+						} else {
+							$('#personalbest').html(myHighscore);
+						}
+						var topscoreTemplate = getTemplate('topscore');
+						highscoresRef.on('value', function(highscoresSnapshot) {
+							$('#topscores').html(''); // clear current list, since we might be called more than once
+							var scores = [];
+							highscoresSnapshot.forEach(function (scoreSnapshot) {
+								scores.push( { name: scoreSnapshot.name(), score: scoreSnapshot.val().score } );
+							})
+							for (var i=0; i < Math.min(3, scores.length); i++) {
+								var highscore = scores[scores.length-1-i];
+								$('#topscores').append(format(topscoreTemplate, i+1, highscore.name, highscore.score));
+							}
+						});
+						break;
+					default:
+						alert('Invalid GamePhase: '+phase);
+				}
+			}
+		}
+		function evaluateInput(text) {
+			var foundMatch = false;
+			if (text.length > 0) {
+				$('#wordsDiv div.word').each(function() {
+					$(this).removeClass('selected');
+					var word = $(this).text();
+					if (word.indexOf(text) === 0) {
+						foundMatch = true;
+						$(this).addClass('selected');
+						// store the keystroke for ghost replay and verification
+						keystrokes.push([ new Date().getTime() - startTime, text.substring(text.length-1) ]);
+						// TODO: clear selected letters on the previous word
+						if (myCurrentWord != word) {
+							$('#wordsDiv div.word').removeClass('selected');
+							console.log('starting on '+word);
+							myCurrentWord = word;
+						}
+						$(this).children('.letter').each(function(index, elm) {
+							$(this).toggleClass('selected', index < text.length);
+						});
+						// handle the word being completed, so the player doesn't need to press <enter>
+						if (text.length == word.length) {
+							console.log('done with '+word);
+							myScoreRef.transaction(function(score) {
+								return score + text.length - 2;
+							});
+							wordsRef.child(text).remove();
+							$('#wordInput').val('');
+							foundMatch = false; // fake not finding a match, since the player completed the word
+						}
+					}
+				});
+			} else {
+				// clear current word
+				$('#wordsDiv div.word').removeClass('selected');
+			}
+			return foundMatch;
+		}
+
+		$(document).keyup(function (e) {
+			if (e.which >= 65 && e.which <=90) console.log('uppercase key pressed: '+e.which)
+			//else if (e.which >= 97 && e.which <=122) text += String.fromCharCode(e.which);
+			else if (e.which == 8) console.log('Backspace pressed');
+			else if (e.which == 27) {
+				$('#wordInput').val('');
+				evaluateInput('');
+			}
+		});
+		
+		$(document).keypress(function (e) {
+			var mustCancel = false;
+			switch (phase) {
+				case GamePhase.Loaded:
+					setGamePhase(GamePhase.Playing);
+					mustCancel = true;
+					break;
+				case GamePhase.Playing:
+					var text = $('#wordInput').val();
+					if (e.which >= 65 && e.which <=90) text += String.fromCharCode(e.which).toLowerCase();
+					else if (e.which >= 97 && e.which <=122) text += String.fromCharCode(e.which);
+					else if (e.which == 8) text = text.substring(0, text.length-1); // Backspace
+					//else if (e.which == 27) text = ''; // Esc
+					else console.log('unhandled key: '+e.which);
+					$('#wordInput').val(text);
+
+					mustCancel = !evaluateInput(text);
+					mustCancel = true;
+					return false; // cancel
+
+					break;
+				case GamePhase.Done: 
+					$('.gamescreen[data-gamephase="Done"] h2').addClass('blink');
+					$('.gamescreen[data-gamephase="Done"] p').hide();
+					//setTimeout("document.location.assign('lobby.html?name="+name+"')", 2000);
+					break;				
+			}
+			
+			if (mustCancel) return false;
+		});
+		gotdRef.on('value', function(snapshot) {
+			gamenum = snapshot.val();
+			console.log('Today we\'re playing game '+gamenum);
+			if (gamenum) {
+				setGamePhase(GamePhase.Loaded);
+				highscoresRef = dataRef.child('highscores').child('game_'+gamenum+'_time_'+gameTime);
+				myHighscoreRef = highscoresRef.child(name);
+				myHighscoreRef.on('value', function(highscoreSnapshot) {
+					myHighscore = highscoreSnapshot && highscoreSnapshot.val() ? highscoreSnapshot.val().score : 0;
+				});
+			}
+		});
+		wordsRef.on('child_added', function(snapshot) {
+			var word = snapshot.name();
+			var wordDiv = $('<div class="word"/>').attr('id', 'word_'+word);
+			$(word.split('')).each(function(){ 
+				$('<span class="letter">'+this+'</span>').appendTo(wordDiv) 
+			});
+			$('#wordsDiv').append(wordDiv);
+		});
+		wordsRef.on('child_removed', function(snapshot) {
+			var word = snapshot.name();
+			$('#word_'+word).remove();
+		});
+		myScoreRef.on('value', function(scoreSnapshot) {
+			var score = scoreSnapshot.val();
+			$('#scores').html(score);
+		});
+		dictionary = window.localStorage.getItem('dictionary')
+		if (dictionary) {
+			dictionary = JSON.parse(dictionary);
+			log("Dictionary gotten from storage ("+dictionary.length+" words)");
+		} else jQuery.ajax({
+			url: "dictionary/common.txt",
+			dataType: "text",
+			success: function( txt ) {
+				log("Dictionary loaded ("+txt.length+" characters)");
+				dictionary = txt.split(' ');
+				log("Dictionary loaded ("+dictionary.length+" words)");
+				window.localStorage.setItem('dictionary', JSON.stringify(dictionary));
+			},
+			error: function(XMLHttpRequest, textStatus, errorThrown) {
+				log("Unable to load dictionary, you can only remove existing words");
+			}
+		});
+		setInterval(function() {
+			var words = $('#wordsDiv div.word');
+			if (words.length < maxWords && dictionary) {
+				var word = dictionary[Math.round(random() * dictionary.length)];
+				// Only allow words that start with different letters from the ones we already have
+				while (words.filter(function() { return $(this).text()[0] == word[0]; }).size() > 0) {
+					word = dictionary[Math.round(random() * dictionary.length)];
+				}
+				wordsRef.child(word).set(word.length);
+			}
+		}, 250);
+		function random(){
+			// Robert Jenkins' 32 bit integer hash function - JS implementation from V8 benchmark
+			var seed = gamenum = gamenum + numGames;
+			seed = ((seed + 0x7ed55d16) + (seed << 12))  & 0xffffffff;
+			seed = ((seed ^ 0xc761c23c) ^ (seed >>> 19)) & 0xffffffff;
+			seed = ((seed + 0x165667b1) + (seed << 5))   & 0xffffffff;
+			seed = ((seed + 0xd3a2646c) ^ (seed << 9))   & 0xffffffff;
+			seed = ((seed + 0xd3a2646c) ^ (seed << 9))   & 0xffffffff;
+			seed = ((seed + 0xfd7046c5) + (seed << 3))   & 0xffffffff;
+			seed = ((seed ^ 0xb55a4f09) ^ (seed >>> 16)) & 0xffffffff; 
+			return (seed & 0xfffffff) / 0x10000000;
+		}
+    </script>
+  </body>
+</html>
