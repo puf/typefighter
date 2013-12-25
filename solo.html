@@ -300,6 +300,7 @@
 			}
 		});
 		setInterval(function() {
+			console.log('checking word count');
 			var words = $('#wordsDiv div.word');
 			if (words.length < maxWords && dictionary) {
 				var word = dictionary[Math.round(random() * dictionary.length)];
