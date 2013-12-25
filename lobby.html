@@ -37,7 +37,7 @@
 		var lobbyRef = new Firebase('http://puf.firebaseio.com/lobby');
 		var playersRef = lobbyRef.child('online');
 		var myPlayerRef = playersRef.child(name);
-		myPlayerRef.removeOnDisconnect();
+		myPlayerRef.onDisconnect().remove();
 		myPlayerRef.set(':online');
 		
 		function log(text) {
@@ -103,7 +103,6 @@
 					}
 				});
 				$('#sologame').click(function() {
-					alert('starting a solo game');
 					$('#sologame').addClass('blink');
 					setTimeout("document.location.assign('solo.html?name="+name+"')", 1000);
 				});
