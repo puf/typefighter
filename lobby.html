@@ -104,13 +104,8 @@
 				});
 				$('#sologame').click(function() {
 					alert('starting a solo game');
-					
-					var gotdRef = new Firebase('http://puf.firebaseio.com/typefighter/gotd');
-					playersRef.on('value', function(snapshot) {
-						var gameid = snapshot.val();
-						$('#sologame').addClass('blink');
-						setTimeout("document.location.assign('solo.html?name="+name+"&id="+gameid+"')", 1000);
-					});
+					$('#sologame').addClass('blink');
+					setTimeout("document.location.assign('solo.html?name="+name+"')", 1000);
 				});
 			}
 		});
