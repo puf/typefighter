@@ -82,8 +82,8 @@
 		var myHighscoreRef;
 
 		// clear last score and list of words
-		myScoreRef.set(0);
-		wordsRef.remove();
+		myScoreRef.set(0, function(error) { console.log('score set, error (if any): '+error); });
+		wordsRef.remove(function(error) { console.log('words removed, error (if any): '+error); });
 		
 		setGamePhase(GamePhase.Loading);
 		
