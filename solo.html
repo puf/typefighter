@@ -254,7 +254,7 @@
 			
 			if (mustCancel) return false;
 		});
-		gotdRef.on('value', function(snapshot) {
+		gotdRef.once('value', function(snapshot) {
 			gamenum = snapshot.val();
 			console.log('Today we\'re playing game '+gamenum);
 			if (gamenum) {
