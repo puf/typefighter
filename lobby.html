@@ -105,7 +105,7 @@
 				$('#sologame').click(function() {
 					alert('starting a solo game');
 					
-					var gotdRef = new Firebase('http://gamma.firebase.com/puf/typefighter/gotd');
+					var gotdRef = new Firebase('http://puf.firebaseio.com/typefighter/gotd');
 					playersRef.on('value', function(snapshot) {
 						var gameid = snapshot.val();
 						$('#sologame').addClass('blink');
