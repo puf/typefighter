@@ -80,6 +80,19 @@
 		var myScoreRef = gameRef.child('score');
 		var highscoresRef;
 		var myHighscoreRef;
+
+		gotdRef.on('value', function(snapshot) {
+			gamenum = snapshot.val();
+			console.log('Today we\'re playing game '+gamenum);
+			if (gamenum) {
+				setGamePhase(GamePhase.Loaded);
+				highscoresRef = dataRef.child('highscores').child('game_'+gamenum+'_time_'+gameTime);
+				myHighscoreRef = highscoresRef.child(name);
+				myHighscoreRef.on('value', function(highscoreSnapshot) {
+					myHighscore = highscoreSnapshot && highscoreSnapshot.val() ? highscoreSnapshot.val().score : 0;
+				});
+			}
+		});
 		
 		// clear last score and list of words
 		myScoreRef.set(0);
@@ -253,18 +266,6 @@
 			}
 			
 			if (mustCancel) return false;
-		});
-		gotdRef.on('value', function(snapshot) {
-			gamenum = snapshot.val();
-			console.log('Today we\'re playing game '+gamenum);
-			if (gamenum) {
-				setGamePhase(GamePhase.Loaded);
-				highscoresRef = dataRef.child('highscores').child('game_'+gamenum+'_time_'+gameTime);
-				myHighscoreRef = highscoresRef.child(name);
-				myHighscoreRef.on('value', function(highscoreSnapshot) {
-					myHighscore = highscoreSnapshot && highscoreSnapshot.val() ? highscoreSnapshot.val().score : 0;
-				});
-			}
 		});
 		wordsRef.on('child_added', function(snapshot) {
 			var word = snapshot.name();
