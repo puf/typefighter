@@ -31,6 +31,7 @@
 		*/
 		
 		var name = getURLParameter('name') || prompt("What's your name?");
+		if (!getURLParameter('name')) document.location.assign(document.location.href + '?name='+name);
 		var isBot = name.indexOf('bot') == 0;
 		var opponent; // the player I currently challenged
 		
