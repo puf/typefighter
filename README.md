@@ -1,4 +1,4 @@
 typefighter
 ===========
 
-A typing game
+A competitive typing game, based on Firebase
