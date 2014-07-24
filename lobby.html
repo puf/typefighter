@@ -30,6 +30,7 @@
 						:<status> | <challenged_opponent>
 		*/
 		
+		if (!Array.prototype.indexOf) Array.prototype.indexOf = function(item) { return $.inArray(item, this); };
 		var name = getURLParameter('name') || prompt("What's your name?");
 		if (!getURLParameter('name')) document.location.assign(document.location.href + '?name='+name);
 		var isBot = name.indexOf('bot') == 0;
