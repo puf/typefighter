@@ -30,7 +30,6 @@
 						:<status> | <challenged_opponent>
 		*/
 		
-		if (!Array.prototype.indexOf) Array.prototype.indexOf = function(item) { return $.inArray(item, this); };
 		var name = getURLParameter('name') || prompt("What's your name?");
 		if (!getURLParameter('name')) document.location.assign(document.location.href + '?name='+name);
 		var isBot = name.indexOf('bot') == 0;
@@ -76,7 +75,7 @@
 						$('player_'+opponent).addClass('selected');
 					}, 1000);
 				}
-				if (opponent && challengers.indexOf(opponent) > -1) {
+				if (opponent && $.inArray(opponent, challengers) > -1) {
 					$('#player_'+opponent).addClass('blink');
 					$('#challenge').hide();
 					setTimeout("document.location.assign('typefighter.html?name="+name+"&opponent="+opponent+"')", 2000);
@@ -84,7 +83,7 @@
 					$('#challengers').text(challengers.join(' and '));
 				}
 			}
-			$('#players li').each(function() { $(this).toggleClass('challenger', challengers.indexOf($(this).text()) > -1) } );
+			$('#players li').each(function() { $(this).toggleClass('challenger', $.inArray($(this).text(), challengers) > -1) } );
 		});
 
 		// this gets executed when the DOM had loaded
