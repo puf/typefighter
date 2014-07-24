@@ -14,10 +14,17 @@
 		<ul id='players'>
 		</ul>
 	</div>
-	<p>Click on the name of a player to challenge him/her or a <a id='sologame' href='#'>solo game</a>.</p>
+	<p>Click on the name of a player to challenge him/her.</p>
 	<div id='challenge'>
 		You were challenged by <span id='challengers'></span>. 
 		Click a name to challenge/accept.
+	</div>
+	<div>
+		<h3>Top players in the Solo game of the day</h3>
+		<div id='gotdtopscores'>
+			<div class='topscore' id='topscore-template'><span class='rank'/>{0}</span> : <span class='name'>{1}</span> - <span class='score'>{2}</span></div>
+		</div>
+		<p><a id='sologame' href='#'>Click to play a solo game.</a></p>
 	</div>
 	
 	<script type='text/javascript'>
@@ -40,10 +47,28 @@
 		var myPlayerRef = playersRef.child(name);
 		myPlayerRef.onDisconnect().remove();
 		myPlayerRef.set(':online');
+		var dataRef = new Firebase('http://puf.firebaseio.com/typefighter');
+		var gotdRef = dataRef.child('gotd');
+		var templates = {};
 		
 		function log(text) {
 			console.log(text);
 		};
+		function getTemplate(name) {
+			var template = templates[name];
+			if (!template) {
+				template = $('#'+name+'-template')[0];
+				template.parentNode.removeChild(template);
+				template.id = '';
+				templates[name] = template = template.outerHTML;
+			}
+			return template;
+		}
+		function format(template) {
+			result = template.replace('id=', 'templateid=');
+			for (var i=0; i < arguments.length-1; i++) result = result.replace('\{'+i+'\}', arguments[i+1]); 
+			return result;
+		}
 		function getURLParameter(name) {
 			return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 		}
@@ -85,6 +110,29 @@
 			}
 			$('#players li').each(function() { $(this).toggleClass('challenger', $.inArray($(this).text(), challengers) > -1) } );
 		});
+		
+		gotdRef.once('value', function(snapshot) {
+			gamenum = snapshot.val();
+			gameTime = 15; // seconds
+			if (gamenum) {
+				highscoresRef = dataRef.child('highscores').child('game_'+gamenum+'_time_'+gameTime);
+				console.log(highscoresRef.name());
+				myHighscoreRef = highscoresRef.child(name);
+				var topscoreTemplate = getTemplate('topscore');
+				highscoresRef.on('value', function(highscoresSnapshot) {
+					$('#gotdtopscores').html(''); // clear current list, since we might be called more than once
+					var scores = [];
+					highscoresSnapshot.forEach(function (scoreSnapshot) {
+						scores.push( { name: scoreSnapshot.name(), score: scoreSnapshot.val().score } );
+					})
+					for (var i=0; i < Math.min(3, scores.length); i++) {
+						var highscore = scores[scores.length-1-i];
+						$('#gotdtopscores').append(format(topscoreTemplate, i+1, highscore.name, highscore.score));
+					}
+				});
+			}
+		});
+		
 
 		// this gets executed when the DOM had loaded
 		$(function() {
